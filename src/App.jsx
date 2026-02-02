@@ -1,94 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import FilterSidebar from './components/FilterSidebar';
-import LabInfoCards from './components/LabInfoCard';
-import ScheduleTable from './components/ScheduleTable';
-import Footer from './components/Footer';
-import { initialSchedule, labs, days, statuses } from './data/scheduleData';
-
-const App = () => {
-  const [schedule, setSchedule] = useState(initialSchedule);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLab, setSelectedLab] = useState('semua');
-  const [selectedDay, setSelectedDay] = useState('semua');
-  const [selectedStatus, setSelectedStatus] = useState('semua');
-  const [currentTime, setCurrentTime] = useState(new Date());
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { auth } from './firebase/config';
+import PostJadwal from "./pages/PostJadwal";
+import LoginPage from './pages/LoginPage';
+import Homepage from './pages/Homepage';
+import Navbar from './components/Navbar';
+  
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    
-    return () => clearInterval(timer);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    let filtered = initialSchedule;
-    
-    if (searchTerm) {
-      filtered = filtered.filter(item => 
-        item.matkul.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.dosen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.kelas.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (selectedLab !== 'semua') {
-      filtered = filtered.filter(item => item.lab === selectedLab);
-    }
-    
-    if (selectedDay !== 'semua') {
-      filtered = filtered.filter(item => item.hari === selectedDay);
-    }
-    
-    if (selectedStatus !== 'semua') {
-      filtered = filtered.filter(item => item.status === selectedStatus);
-    }
-    
-    setSchedule(filtered);
-  }, [searchTerm, selectedLab, selectedDay, selectedStatus]);
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setSelectedLab('semua');
-    setSelectedDay('semua');
-    setSelectedStatus('semua');
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <Header currentTime={currentTime} />
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <FilterSidebar
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            selectedLab={selectedLab}
-            setSelectedLab={setSelectedLab}
-            selectedDay={selectedDay}
-            setSelectedDay={setSelectedDay}
-            selectedStatus={selectedStatus}
-            setSelectedStatus={setSelectedStatus}
-            resetFilters={resetFilters}
-            schedule={schedule}
-            initialSchedule={initialSchedule}
-            labs={labs}
-            days={days}
-            statuses={statuses}
-          />
-          
-          <div className="lg:col-span-3">
-            <LabInfoCards labs={labs} initialSchedule={initialSchedule} />
-            
-            <ScheduleTable schedule={schedule} statuses={statuses} />
-            
-            <Footer />
-          </div>
-        </div>
+    <Router>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
+        <Navbar />
+
+        <Routes>
+          <Route path='/' element={<Homepage />} />
+          <Route path="/post-jadwal" element={
+            user ? <PostJadwal /> : <Navigate to="/login" />
+          } />
+          <Route path="/login" element={
+            user ? <Navigate to="/post-jadwal" /> : <LoginPage />
+          } />
+        </Routes>
+         <PostJadwal />
       </div>
-    </div>
+    </Router>
   );
-};
+}
 
 export default App;

@@ -1,4 +1,3 @@
-import React from 'react';
 import { formatTime, formatDate } from '../utils/dateFormatter';
 
 const Header = ({ currentTime }) => {
