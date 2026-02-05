@@ -1,6 +1,32 @@
-import { formatTime, formatDate } from '../utils/dateFormatter';
+// components/Header.js
+import React from 'react';
 
-const Header = ({ currentTime }) => {
+const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, scheduleStats = {}, activeLabsCount = 0 }) => {
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const formatDate = (date) => {
+    const options = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    };
+    return date.toLocaleDateString('id-ID', options);
+  };
+
+  const stats = {
+    total: totalSchedules,
+    ongoing: scheduleStats.ongoing || 0,
+    upcoming: scheduleStats.upcoming || 0,
+    empty: scheduleStats.empty || 0
+  };
+
   return (
     <header className="relative mb-12">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-10 rounded-3xl"></div>
@@ -17,19 +43,19 @@ const Header = ({ currentTime }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
                   </svg>
                 </div>
-                <div className="absolute -top-2 -right-2 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">3</span>
+                <div className={`absolute -top-2 -right-2 w-6 h-6 ${activeLabsCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'} rounded-full flex items-center justify-center`}>
+                  <span className="text-xs font-bold text-white">{activeLabsCount}</span>
                 </div>
               </div>
               
               <div>
-                <h1 className="text-4xl md:text-5xl font-bold text-blue-700">
+                <h1 className="text-3xl md:text-4xl font-bold text-blue-700">
                   Jadwal Lab Komputer
                 </h1>
                 <div className="flex items-center gap-3 mt-2">
                   <span className="text-gray-600">Teknik Telekomunikasi</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span className="text-gray-600">Politeknik Negeri Semarang</span>
+                  <span className="text-gray-600">Politeknik Negeri Jakarta</span>
                 </div>
               </div>
             </div>
@@ -37,16 +63,18 @@ const Header = ({ currentTime }) => {
             {/* Status Indicator */}
             <div className="flex flex-wrap gap-4 mt-6">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-700">Aktif</span>
+                <div className={`w-3 h-3 rounded-full ${stats.ongoing > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                <span className="text-sm font-medium text-gray-700">
+                  {stats.ongoing > 0 ? `${stats.ongoing} Aktif` : 'Tidak Aktif'}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-700">3 Lab Tersedia</span>
+                <span className="text-sm font-medium text-gray-700">{activeLabsCount} Lab Tersedia</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-700">Online</span>
+                <span className="text-sm font-medium text-gray-700">Real-time</span>
               </div>
             </div>
           </div>
@@ -65,7 +93,7 @@ const Header = ({ currentTime }) => {
                 </div>
                 
                 <div className="relative">
-                  <div className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+                  <div className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
                     <span className="bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
                       {formatTime(currentTime)}
                     </span>
@@ -83,7 +111,7 @@ const Header = ({ currentTime }) => {
                 
                 <div className="mt-4 pt-4 border-t border-gray-700/50">
                   <div className="text-xs text-gray-400">
-                    Update otomatis setiap menit
+                    {filteredSchedules} jadwal tersaring dari {totalSchedules} total
                   </div>
                 </div>
               </div>
@@ -99,19 +127,19 @@ const Header = ({ currentTime }) => {
         <div className="mt-8 pt-6 border-t border-gray-200/50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">15</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
               <div className="text-sm text-gray-600">Total Jadwal</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">1</div>
+              <div className="text-2xl font-bold text-green-600">{stats.ongoing}</div>
               <div className="text-sm text-gray-600">Sedang Berlangsung</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">13</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.upcoming}</div>
               <div className="text-sm text-gray-600">Akan Datang</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-600">1</div>
+              <div className="text-2xl font-bold text-gray-600">{stats.empty}</div>
               <div className="text-sm text-gray-600">Kosong</div>
             </div>
           </div>

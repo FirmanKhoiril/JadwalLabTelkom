@@ -44,10 +44,10 @@ const FilterSidebar = ({
             {labs.map((lab, index) => (
               <button
                 key={index}
-                className={`w-full text-left px-4 py-3 rounded-xl ${selectedLab === lab ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-gray-100 text-gray-700'}`}
-                onClick={() => setSelectedLab(lab)}
+                className={`w-full text-left px-4 py-3 rounded-xl ${selectedLab === lab.name ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-gray-100 text-gray-700'}`}
+                onClick={() => setSelectedLab(lab.name)}
               >
-                {lab}
+                {lab.name}
               </button>
             ))}
           </div>

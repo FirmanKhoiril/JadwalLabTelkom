@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addSchedule, updateSchedule, deleteSchedule, getSchedules, auth } from '../firebase/config';
+import { 
+  addSchedule, 
+  updateSchedule, 
+  deleteSchedule, 
+  getSchedulesByUser,  // Ganti dengan getSchedulesByUser
+  auth, 
+  logout,
+  getCurrentUser
+} from '../firebase/config';
 
 const PostJadwal = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [schedules, setSchedules] = useState([]);
+  const [userEmail, setUserEmail] = useState('');
   const [formData, setFormData] = useState({
     lab: '',
     matkul: '',
@@ -13,27 +22,27 @@ const PostJadwal = () => {
     dosen: '',
     waktu: '',
     hari: '',
-    status: 'akan datang'
+    status: 'Akan Datang'
   });
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // Check login status
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       setIsLoggedIn(!!user);
-      if (!user) {
+      if (user) {
+        setUserEmail(user.email);
+      } else {
         navigate('/');
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // Load schedules from Firebase
   useEffect(() => {
     if (isLoggedIn) {
-      const unsubscribe = getSchedules((data) => {
+      const unsubscribe = getSchedulesByUser((data) => {
         setSchedules(data);
       });
       return () => unsubscribe();
@@ -68,7 +77,6 @@ const PostJadwal = () => {
       }
 
       if (result.success) {
-        // Reset form
         setFormData({
           lab: '',
           matkul: '',
@@ -76,9 +84,13 @@ const PostJadwal = () => {
           dosen: '',
           waktu: '',
           hari: '',
-          status: 'akan datang'
+          status: 'Akan Datang'
         });
         setEditingId(null);
+        
+        setTimeout(() => {
+          setMessage({ type: '', text: '' });
+        }, 3000);
       } else {
         setMessage({ type: 'error', text: result.error });
       }
@@ -121,26 +133,29 @@ const PostJadwal = () => {
     navigate('/');
   };
 
-  // if (!isLoggedIn) {
-  //   return (
-  //     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
-  //       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-  //         <p className="text-gray-600">Memeriksa autentikasi...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memeriksa autentikasi...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <header className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Admin Panel</h1>
               <p className="text-lg text-gray-600 mt-2">Kelola Jadwal Lab Komputer</p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-500">Login sebagai: {userEmail}</span>
+              </div>
             </div>
             
             <div className="flex items-center gap-4">
@@ -160,7 +175,6 @@ const PostJadwal = () => {
           </div>
         </header>
 
-        {/* Message Alert */}
         {message.text && (
           <div className={`mb-6 p-4 rounded-xl ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
             {message.text}
@@ -168,7 +182,6 @@ const PostJadwal = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form Panel */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-8">
               <h2 className="text-xl font-bold text-gray-800 mb-6">
@@ -212,7 +225,7 @@ const PostJadwal = () => {
                     name="kelas"
                     value={formData.kelas}
                     onChange={handleChange}
-                    placeholder="Contoh: TT-4A"
+                    placeholder="Contoh: TE-4A"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                     required
                   />
@@ -310,12 +323,18 @@ const PostJadwal = () => {
             </div>
           </div>
 
-          {/* List Jadwal */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-gray-800">Daftar Jadwal ({schedules.length})</h2>
-                <p className="text-gray-600">Kelola semua jadwal lab komputer</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">Daftar Jadwal Anda ({schedules.length})</h2>
+                    <p className="text-gray-600">Hanya menampilkan jadwal yang Anda buat</p>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {userEmail}
+                  </div>
+                </div>
               </div>
 
               {schedules.length === 0 ? (
@@ -337,6 +356,7 @@ const PostJadwal = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lab</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mata Kuliah</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                       </tr>
                     </thead>
@@ -355,6 +375,17 @@ const PostJadwal = () => {
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-900">{item.kelas}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              item.status === 'berlangsung' 
+                                ? 'bg-green-100 text-green-800' 
+                                : item.status === 'akan datang' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {item.status}
+                            </span>
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex space-x-2">
@@ -380,11 +411,10 @@ const PostJadwal = () => {
               )}
             </div>
 
-            {/* Stats */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white rounded-xl p-4 shadow">
                 <div className="text-2xl font-bold text-blue-600">{schedules.length}</div>
-                <div className="text-sm text-gray-600">Total Jadwal</div>
+                <div className="text-sm text-gray-600">Total Jadwal Anda</div>
               </div>
               <div className="bg-white rounded-xl p-4 shadow">
                 <div className="text-2xl font-bold text-green-600">

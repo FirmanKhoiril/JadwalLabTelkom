@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, getDoc } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzWfGlfLDjgVu0rySSfmwTv0RssyfdnFo",
@@ -12,110 +12,196 @@ const firebaseConfig = {
   measurementId: "G-MJ09ZKX6X8"
 };
 
-console.log("Firebase Config: Initializing...");
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Set persistence untuk menjaga login state
-// import { setPersistence, browserLocalPersistence } from "firebase/auth";
-// setPersistence(auth, browserLocalPersistence);
-
-// Debug: Listen langsung ke auth state
-onAuthStateChanged(auth, (user) => {
-  console.log("🔥 Firebase DIRECT Auth State Changed:", user ? `User: ${user.email}` : "No user (null)");
-});
-
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({
-  prompt: 'select_account' // Force account selection every time
+  prompt: 'select_account'
 });
 
-// Collections
-const scheduleCollection = collection(db, 'schedules');
+const scheduleCollection = collection(db, 'jadwal');
 
-// CRUD Operations
 export const addSchedule = async (scheduleData) => {
   try {
-    const docRef = await addDoc(scheduleCollection, {
-      ...scheduleData,
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+    
+    const firestoreData = {
+      Dosen: scheduleData.dosen,
+      Hari: scheduleData.hari,
+      KeLas: scheduleData.kelas,
+      Lab: scheduleData.lab,
+      MatKul: scheduleData.matkul,
+      Status: scheduleData.status,
+      Waktu: scheduleData.waktu,
+      userId: user.uid,
+      userEmail: user.email,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    });
+    };
+    
+    const docRef = await addDoc(scheduleCollection, firestoreData);
     return { success: true, id: docRef.id };
   } catch (error) {
-    console.error("Error adding schedule: ", error);
     return { success: false, error: error.message };
   }
 };
 
 export const updateSchedule = async (id, scheduleData) => {
   try {
-    const scheduleRef = doc(db, 'schedules', id);
-    await updateDoc(scheduleRef, {
-      ...scheduleData,
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+    
+    const scheduleRef = doc(db, 'jadwal', id);
+    const scheduleDoc = await getDoc(scheduleRef);
+    const schedule = scheduleDoc.data();
+    
+    if (schedule.userId !== user.uid) {
+      throw new Error("Unauthorized: You can only update your own schedules");
+    }
+    
+    const firestoreData = {
+      Dosen: scheduleData.dosen,
+      Hari: scheduleData.hari,
+      KeLas: scheduleData.kelas,
+      Lab: scheduleData.lab,
+      MatKul: scheduleData.matkul,
+      Status: scheduleData.status,
+      Waktu: scheduleData.waktu,
       updatedAt: new Date().toISOString()
-    });
+    };
+    
+    await updateDoc(scheduleRef, firestoreData);
     return { success: true };
   } catch (error) {
-    console.error("Error updating schedule: ", error);
     return { success: false, error: error.message };
   }
 };
 
 export const deleteSchedule = async (id) => {
   try {
-    const scheduleRef = doc(db, 'schedules', id);
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+    
+    const scheduleRef = doc(db, 'jadwal', id);
+    const scheduleDoc = await getDoc(scheduleRef);
+    const schedule = scheduleDoc.data();
+    
+    if (schedule.userId !== user.uid) {
+      throw new Error("Unauthorized: You can only delete your own schedules");
+    }
+    
     await deleteDoc(scheduleRef);
     return { success: true };
   } catch (error) {
-    console.error("Error deleting schedule: ", error);
     return { success: false, error: error.message };
   }
 };
 
 export const getSchedules = (callback) => {
-  const q = query(scheduleCollection, orderBy('hari', 'asc'), orderBy('waktu', 'asc'));
+  const q = query(scheduleCollection, orderBy('Hari', 'asc'), orderBy('Waktu', 'asc'));
   
   return onSnapshot(q, (snapshot) => {
     const schedules = [];
     snapshot.forEach((doc) => {
-      schedules.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      schedules.push({
+        id: doc.id,
+        lab: data.Lab || '',
+        matkul: data.MatKul || '',
+        kelas: data.KeLas || '',
+        dosen: data.Dosen || '',
+        waktu: data.Waktu || '',
+        hari: data.Hari || '',
+        status: data.Status || 'Akan Datang',
+        userId: data.userId,
+        userEmail: data.userEmail
+      });
     });
     callback(schedules);
   });
 };
 
-// Authentication - FIXED VERSION
+export const getSchedulesByUser = (callback) => {
+  const user = auth.currentUser;
+  if (!user) {
+    callback([]);
+    return () => {};
+  }
+  
+  const q = query(
+    scheduleCollection, 
+    where('userId', '==', user.uid),
+    orderBy('Hari', 'asc'), 
+    orderBy('Waktu', 'asc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const schedules = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      schedules.push({
+        id: doc.id,
+        lab: data.Lab || '',
+        matkul: data.MatKul || '',
+        kelas: data.KeLas || '',
+        dosen: data.Dosen || '',
+        waktu: data.Waktu || '',
+        hari: data.Hari || '',
+        status: data.Status || 'Akan Datang',
+        userId: data.userId,
+        userEmail: data.userEmail
+      });
+    });
+    callback(schedules);
+  });
+};
+
+export const getAllSchedulesForAdmin = (callback) => {
+  const q = query(
+    scheduleCollection,
+    orderBy('Hari', 'asc'), 
+    orderBy('Waktu', 'asc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const schedules = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      schedules.push({
+        id: doc.id,
+        lab: data.Lab || '',
+        matkul: data.MatKul || '',
+        kelas: data.KeLas || '',
+        dosen: data.Dosen || '',
+        waktu: data.Waktu || '',
+        hari: data.Hari || '',
+        status: data.Status || 'Akan Datang',
+        userId: data.userId,
+        userEmail: data.userEmail
+      });
+    });
+    callback(schedules);
+  });
+};
+
 export const signInWithGoogle = async () => {
   try {
-    console.log("🚀 signInWithGoogle: Starting Google sign in...");
-    
-    // Force account selection and get additional scopes
-    provider.addScope('email');
-    provider.addScope('profile');
-    
     const result = await signInWithPopup(auth, provider);
-    console.log("✅ signInWithGoogle: Success!");
-    console.log("   User:", result.user.email);
-    console.log("   Access Token:", result.user.accessToken);
-    
-    // Cek auth state setelah login
-    console.log("   Auth currentUser:", auth.currentUser?.email);
-    
     return { 
       success: true, 
       user: result.user,
       credential: GoogleAuthProvider.credentialFromResult(result)
     };
   } catch (error) {
-    console.error("❌ signInWithGoogle Error:", error);
-    console.error("   Error Code:", error.code);
-    console.error("   Error Message:", error.message);
-    console.error("   Email:", error.email);
-    console.error("   Credential:", error.credential);
-    
     return { 
       success: false, 
       error: error.message,
@@ -124,19 +210,86 @@ export const signInWithGoogle = async () => {
   }
 };
 
+export const getAllSchedules = () => {
+  return new Promise((resolve, reject) => {
+    const q = query(scheduleCollection, orderBy('Hari', 'asc'), orderBy('Waktu', 'asc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const schedules = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        schedules.push({
+          id: doc.id,
+          lab: data.Lab || '',
+          matkul: data.MatKul || '',
+          kelas: data.KeLas || '',
+          dosen: data.Dosen || '',
+          waktu: data.Waktu || '',
+          hari: data.Hari || '',
+          status: data.Status || 'Akan Datang',
+          userId: data.userId,
+          userEmail: data.userEmail
+        });
+      });
+      resolve(schedules);
+      unsubscribe();
+    }, reject);
+  });
+};
+
+export const getRealTimeSchedules = (callback) => {
+  try {
+    const q = query(scheduleCollection, orderBy('Hari', 'asc'));
+    
+    const unsubscribe = onSnapshot(
+      q, 
+      (snapshot) => {
+        const schedules = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          schedules.push({
+            id: doc.id,
+            lab: data.Lab || '',
+            matkul: data.MatKul || '',
+            kelas: data.KeLas || '',
+            dosen: data.Dosen || '',
+            waktu: data.Waktu || '',
+            hari: data.Hari || '',
+            status: data.Status || 'Akan Datang',
+            userId: data.userId,
+            userEmail: data.userEmail
+          });
+        });
+        
+        const hariOrder = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        schedules.sort((a, b) => {
+          const hariCompare = hariOrder.indexOf(a.hari) - hariOrder.indexOf(b.hari);
+          if (hariCompare !== 0) return hariCompare;
+          return a.waktu.localeCompare(b.waktu);
+        });
+        
+        callback(schedules);
+      },
+      (error) => {
+        callback([]);
+      }
+    );
+    
+    return unsubscribe;
+  } catch (error) {
+    return () => {};
+  }
+};
+
 export const logout = async () => {
   try {
-    console.log("Logging out...");
     await signOut(auth);
-    console.log("Logged out successfully");
     return { success: true };
   } catch (error) {
-    console.error("Error signing out: ", error);
     return { success: false, error: error.message };
   }
 };
 
-// Helper function untuk cek auth state
 export const getCurrentUser = () => {
   return auth.currentUser;
 };

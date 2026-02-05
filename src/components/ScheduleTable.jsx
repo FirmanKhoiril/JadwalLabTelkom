@@ -1,11 +1,33 @@
 import React from 'react';
 
-const ScheduleTable = ({ schedule, statuses }) => {
+const ScheduleTable = ({ schedule, statuses, loading = false }) => {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800">Daftar Jadwal Lab</h2>
+          <p className="text-gray-600">Jadwal penggunaan lab komputer teknik telkom</p>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Memuat data jadwal...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-800">Daftar Jadwal Lab</h2>
-        <p className="text-gray-600">Jadwal penggunaan lab komputer teknik telkom</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Daftar Jadwal Lab</h2>
+            <p className="text-gray-600">Jadwal penggunaan lab komputer teknik telkom</p>
+          </div>
+          <div className="text-sm text-gray-500">
+            {schedule.length} jadwal ditemukan
+          </div>
+        </div>
       </div>
       
       {schedule.length === 0 ? (
