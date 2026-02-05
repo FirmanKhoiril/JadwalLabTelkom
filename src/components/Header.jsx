@@ -55,7 +55,7 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
                 <div className="flex items-center gap-3 mt-2">
                   <span className="text-gray-600">Teknik Telekomunikasi</span>
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  <span className="text-gray-600">Politeknik Negeri Jakarta</span>
+                  <span className="text-gray-600">Politeknik Negeri Semarang</span>
                 </div>
               </div>
             </div>
