@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx'; // Tambahkan library Excel
+import * as XLSX from 'xlsx';
 import { 
   addSchedule, 
   updateSchedule, 
@@ -8,7 +8,7 @@ import {
   getSchedulesByUser,
   auth, 
   logout,
-  getCurrentUser
+  getUniqueLabs
 } from '../firebase/config';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 
@@ -17,6 +17,11 @@ const PostJadwal = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [schedules, setSchedules] = useState([]);
   const [userEmail, setUserEmail] = useState('');
+  const [labs, setLabs] = useState([]);
+  const [loadingLabs, setLoadingLabs] = useState(true);
+  const [newLab, setNewLab] = useState('');
+  const [showNewLabInput, setShowNewLabInput] = useState(false);
+  
   const [formData, setFormData] = useState({
     lab: '',
     matkul: '',
@@ -29,13 +34,23 @@ const PostJadwal = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  
-  // State untuk import Excel
+
   const [excelFile, setExcelFile] = useState(null);
   const [excelData, setExcelData] = useState([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [showImportModal, setShowImportModal] = useState(false);
+
+  useEffect(() => {
+    const unsubscribeLabs = getUniqueLabs((fetchedLabs) => {
+      setLabs(fetchedLabs);
+      setLoadingLabs(false);
+    });
+
+    return () => {
+      if (unsubscribeLabs) unsubscribeLabs();
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -58,7 +73,6 @@ const PostJadwal = () => {
     }
   }, [isLoggedIn]);
 
-  // ==================== FUNGSI IMPORT EXCEL ====================
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -70,16 +84,12 @@ const PostJadwal = () => {
       const data = new Uint8Array(event.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       
-      // Ambil sheet pertama
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       
-      // Convert ke JSON
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
-      // Mapping kolom Excel ke format aplikasi
       const mappedData = jsonData.map((row, index) => {
-        // Cari kolom dengan nama yang sesuai (case insensitive)
         const findColumn = (possibleNames) => {
           for (const name of possibleNames) {
             if (row[name] !== undefined) return row[name];
@@ -96,7 +106,7 @@ const PostJadwal = () => {
           waktu: findColumn(['Waktu', 'waktu', 'WAKTU', 'Time', 'Jam']),
           status: findColumn(['Status', 'status', 'STATUS', 'Kondisi']) || 'Akan Datang'
         };
-      }).filter(item => item.lab && item.matkul); // Hanya data yang valid
+      }).filter(item => item.lab && item.matkul);
 
       setExcelData(mappedData);
       setMessage({ 
@@ -125,7 +135,6 @@ const PostJadwal = () => {
     for (let i = 0; i < excelData.length; i++) {
       const data = excelData[i];
       
-      // Validasi data
       if (!data.lab || !data.matkul || !data.kelas || !data.dosen || !data.hari || !data.waktu) {
         errors.push(`Baris ${i + 2}: Data tidak lengkap`);
         errorCount++;
@@ -154,10 +163,8 @@ const PostJadwal = () => {
         errorCount++;
       }
 
-      // Update progress
       setImportProgress({ current: i + 1, total: excelData.length });
       
-      // Delay kecil untuk menghindari rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
@@ -175,7 +182,6 @@ const PostJadwal = () => {
       });
     }
 
-    // Reset data
     setTimeout(() => {
       setExcelFile(null);
       setExcelData([]);
@@ -185,60 +191,54 @@ const PostJadwal = () => {
   };
 
   const downloadTemplateExcel = () => {
-    // Data template
-    const templateData = [
-      {
-        'Lab': 'Lab Komputer 1',
-        'Mata Kuliah': 'Pemrograman Web',
-        'Kelas': 'TE-4A',
-        'Dosen': 'Dr. Ahmad Rizal, M.T.',
-        'Hari': 'Senin',
-        'Waktu': '08:00 - 10:30',
-        'Status': 'Akan Datang'
-      },
-      {
-        'Lab': 'Lab Komputer 2',
-        'Mata Kuliah': 'Jaringan Komputer',
-        'Kelas': 'TE-3B',
-        'Dosen': 'Prof. Siti Aminah, M.Sc.',
-        'Hari': 'Senin',
-        'Waktu': '10:45 - 13:15',
-        'Status': 'Sedang Berlangsung'
-      }
-    ];
+    const templateData = labs.length > 0 
+      ? labs.slice(0, 2).map((lab, index) => ({
+          'Lab': lab.name,
+          'Mata Kuliah': index === 0 ? '3D Blender' : 'Jaringan Komputer',
+          'Kelas': index === 0 ? 'TE-4A' : 'TE-3B',
+          'Dosen': index === 0 ? 'Dr. Ahmad Rizal, M.T.' : 'Prof. Siti Aminah, M.Sc.',
+          'Hari': 'Senin',
+          'Waktu': index === 0 ? '08:00 - 10:30' : '10:45 - 13:15',
+          'Status': 'Akan Datang'
+        }))
+      : [
+        {
+          'Lab': 'Lab Komputer 1',
+          'Mata Kuliah': 'Pemrograman',
+          'Kelas': 'TE-4A',
+          'Dosen': 'Dr. Ahmad Rizal, M.T.',
+          'Hari': 'Senin',
+          'Waktu': '08:00 - 10:30',
+          'Status': 'Akan Datang'
+        }
+      ];
 
-    // Buat worksheet
     const ws = XLSX.utils.json_to_sheet(templateData);
     
-    // Buat workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template Jadwal");
     
-    // Tambahkan note di cell A10
     const noteData = [
-      ['CATATAN PENTAH:'],
+      ['CATATAN PENTING:'],
       ['1. Kolom wajib diisi: Lab, Mata Kuliah, Kelas, Dosen, Hari, Waktu'],
       ['2. Status (opsional): "Sedang Berlangsung", "Akan Datang", atau "Kosong"'],
       ['3. Format waktu: "HH:mm - HH:mm" (contoh: 08:00 - 10:30)'],
-      ['4. Hari: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu'],
-      ['5. Lab: Lab Komputer 1, Lab Komputer 2, Lab Komputer 3']
+      ['4. Hari: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu']
     ];
     
     XLSX.utils.sheet_add_aoa(ws, noteData, { origin: 'A10' });
-    
-    // Atur lebar kolom
+
     const wscols = [
-      { wch: 15 }, // Lab
-      { wch: 25 }, // Mata Kuliah
-      { wch: 10 }, // Kelas
-      { wch: 25 }, // Dosen
-      { wch: 10 }, // Hari
-      { wch: 15 }, // Waktu
-      { wch: 20 }  // Status
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 10 },
+      { wch: 25 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 20 }
     ];
     ws['!cols'] = wscols;
     
-    // Download file
     XLSX.writeFile(wb, 'template_jadwal_lab.xlsx');
   };
 
@@ -248,7 +248,6 @@ const PostJadwal = () => {
       return;
     }
 
-    // Format data untuk export
     const exportData = schedules.map(item => ({
       'Lab': item.lab,
       'Mata Kuliah': item.matkul,
@@ -261,14 +260,11 @@ const PostJadwal = () => {
       'Dibuat Oleh': item.userEmail || userEmail
     }));
 
-    // Buat worksheet
     const ws = XLSX.utils.json_to_sheet(exportData);
     
-    // Buat workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Jadwal Lab");
     
-    // Download file
     XLSX.writeFile(wb, `jadwal_lab_${new Date().toISOString().split('T')[0]}.xlsx`);
     
     setMessage({ 
@@ -277,7 +273,30 @@ const PostJadwal = () => {
     });
   };
 
-  // ==================== FUNGSI LAINNYA (tetap sama) ====================
+  const handleAddNewLab = () => {
+    if (newLab.trim() === '') {
+      setMessage({ type: 'error', text: 'Nama lab tidak boleh kosong!' });
+      return;
+    }
+
+    const labExists = labs.some(lab => lab.name.toLowerCase() === newLab.toLowerCase());
+    if (labExists) {
+      setMessage({ type: 'error', text: 'Lab dengan nama tersebut sudah ada!' });
+      return;
+    }
+
+    const newLabObject = {
+      id: newLab.toLowerCase().replace(/\s+/g, '-'),
+      name: newLab
+    };
+
+    setLabs(prev => [...prev, newLabObject]);
+    setFormData(prev => ({ ...prev, lab: newLab }));
+    setNewLab('');
+    setShowNewLabInput(false);
+    setMessage({ type: 'success', text: `Lab "${newLab}" berhasil ditambahkan!` });
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -290,6 +309,12 @@ const PostJadwal = () => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: '', text: '' });
+
+    if (!formData.lab) {
+      setMessage({ type: 'error', text: 'Silakan pilih lab terlebih dahulu!' });
+      setLoading(false);
+      return;
+    }
 
     try {
       let result;
@@ -362,7 +387,6 @@ const PostJadwal = () => {
     navigate('/');
   };
 
-  // ==================== RENDER ====================
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
@@ -386,6 +410,14 @@ const PostJadwal = () => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="text-sm text-gray-500">Login sebagai: {userEmail}</span>
               </div>
+              {!loadingLabs && (
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm text-gray-500">
+                    {labs.length} lab tersedia
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
@@ -405,7 +437,6 @@ const PostJadwal = () => {
           </div>
         </header>
 
-        {/* Notifikasi */}
         {message.text && (
           <div className={`mb-6 p-4 rounded-xl ${message.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
             <div className="flex justify-between items-center">
@@ -417,12 +448,10 @@ const PostJadwal = () => {
           </div>
         )}
 
-        {/* Tombol Import/Export */}
         <div className="mb-6 bg-white rounded-2xl shadow-lg p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-4">
-                {/* Import Excel */}
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Import dari Excel
@@ -454,7 +483,6 @@ const PostJadwal = () => {
                   )}
                 </div>
 
-                {/* Export Excel */}
                 <div className="flex flex-col">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Export Data
@@ -473,7 +501,6 @@ const PostJadwal = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form Panel (tetap sama) */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-8">
               <h2 className="text-xl font-bold text-gray-800 mb-6">
@@ -482,19 +509,76 @@ const PostJadwal = () => {
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lab</label>
-                  <select
-                    name="lab"
-                    value={formData.lab}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                    required
-                  >
-                    <option value="">Pilih Lab</option>
-                    <option value="Lab Komputer 1">Lab Komputer 1</option>
-                    <option value="Lab Komputer 2">Lab Komputer 2</option>
-                    <option value="Lab Komputer 3">Lab Komputer 3</option>
-                  </select>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Lab {loadingLabs && <span className="text-blue-500 text-xs">(memuat...)</span>}
+                    </label>
+                    {!showNewLabInput && (
+                      <button
+                        type="button"
+                        onClick={() => setShowNewLabInput(true)}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        + Tambah Lab Baru
+                      </button>
+                    )}
+                  </div>
+                  
+                  {showNewLabInput ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newLab}
+                        onChange={(e) => setNewLab(e.target.value)}
+                        placeholder="Nama lab baru"
+                        className="flex-1 px-4 py-3 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewLab}
+                        className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition"
+                      >
+                        Tambah
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewLabInput(false);
+                          setNewLab('');
+                        }}
+                        className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      name="lab"
+                      value={formData.lab}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                      required
+                      disabled={loadingLabs}
+                    >
+                      <option value="">Pilih Lab</option>
+                      {loadingLabs ? (
+                        <option value="">Memuat data lab...</option>
+                      ) : labs.length === 0 ? (
+                        <option value="">Belum ada lab tersedia</option>
+                      ) : (
+                        labs.map((lab) => (
+                          <option key={lab.id} value={lab.name}>
+                            {lab.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  )}
+                  {!loadingLabs && labs.length > 0 && !showNewLabInput && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Pilih dari {labs.length} lab yang tersedia
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -551,6 +635,7 @@ const PostJadwal = () => {
                     <option value="Rabu">Rabu</option>
                     <option value="Kamis">Kamis</option>
                     <option value="Jumat">Jumat</option>
+                    <option value="Sabtu">Sabtu</option>
                   </select>
                 </div>
 
@@ -575,17 +660,17 @@ const PostJadwal = () => {
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                   >
-                    <option value="berlangsung">Sedang Berlangsung</option>
-                    <option value="akan datang">Akan Datang</option>
-                    <option value="kosong">Kosong</option>
+                    <option value="Berlangsung">Sedang Berlangsung</option>
+                    <option value="Akan Datang">Akan Datang</option>
+                    <option value="Kosong">Kosong</option>
                   </select>
                 </div>
 
                 <div className="pt-4">
                   <button
                     type="submit"
-                    disabled={loading}
-                    className={`w-full py-3 rounded-xl font-medium transition ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    disabled={loading || loadingLabs}
+                    className={`w-full py-3 rounded-xl font-medium transition ${loading || loadingLabs ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                   >
                     {loading ? 'Memproses...' : editingId ? 'Update Jadwal' : 'Tambah Jadwal'}
                   </button>
@@ -601,7 +686,7 @@ const PostJadwal = () => {
                           dosen: '',
                           waktu: '',
                           hari: '',
-                          status: 'akan datang'
+                          status: 'Akan Datang'
                         });
                         setEditingId(null);
                       }}
@@ -615,7 +700,6 @@ const PostJadwal = () => {
             </div>
           </div>
 
-          {/* Tabel Jadwal (tetap sama) */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -671,9 +755,9 @@ const PostJadwal = () => {
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              item.status === 'berlangsung' 
+                              item.status === 'Berlangsung' 
                                 ? 'bg-green-100 text-green-800' 
-                                : item.status === 'akan datang' 
+                                : item.status === 'Akan Datang' 
                                 ? 'bg-blue-100 text-blue-800' 
                                 : 'bg-gray-100 text-gray-800'
                             }`}>
@@ -711,13 +795,13 @@ const PostJadwal = () => {
               </div>
               <div className="bg-white rounded-xl p-4 shadow">
                 <div className="text-2xl font-bold text-green-600">
-                  {schedules.filter(s => s.status === 'berlangsung').length}
+                  {schedules.filter(s => s.status === 'Berlangsung').length}
                 </div>
                 <div className="text-sm text-gray-600">Sedang Berlangsung</div>
               </div>
               <div className="bg-white rounded-xl p-4 shadow">
                 <div className="text-2xl font-bold text-yellow-600">
-                  {schedules.filter(s => s.status === 'akan datang').length}
+                  {schedules.filter(s => s.status === 'Akan Datang').length}
                 </div>
                 <div className="text-sm text-gray-600">Akan Datang</div>
               </div>
@@ -726,7 +810,6 @@ const PostJadwal = () => {
         </div>
       </div>
 
-      {/* Modal Preview & Import */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -743,7 +826,6 @@ const PostJadwal = () => {
                 </button>
               </div>
 
-              {/* Progress Bar saat importing */}
               {importLoading && (
                 <div className="mb-6">
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
@@ -759,7 +841,6 @@ const PostJadwal = () => {
                 </div>
               )}
 
-              {/* Preview Data */}
               {excelData.length > 0 && !importLoading && (
                 <>
                   <div className="mb-4">
@@ -769,7 +850,7 @@ const PostJadwal = () => {
                     </p>
                   </div>
 
-                  <div className="overflow-y-auto max-h-[300px] mb-6 border rounded-lg">
+                  <div className="overflow-y-auto max-h-75 mb-6 border rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50 sticky top-0">
                         <tr>

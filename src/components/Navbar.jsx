@@ -8,30 +8,23 @@ const Navbar = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Listen to auth state changes DIRECTLY
   useEffect(() => {
-    console.log("Navbar: Setting up auth listener...");
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Navbar: Auth state changed - User:", currentUser ? currentUser.email : "null");
       setUser(currentUser);
       setLoading(false);
     });
 
-    // Cleanup
     return () => {
-      console.log("Navbar: Cleaning up auth listener");
       unsubscribe();
     };
   }, []);
 
   const handleLogout = async () => {
     try {
-      console.log("Navbar: Logging out...");
       await signOut(auth);
-      console.log("Navbar: Logged out successfully");
       navigate("/");
-      window.location.reload(); // Force refresh untuk update state
+      window.location.reload();
     } catch (error) {
       console.error("Navbar: Logout error:", error);
     }
@@ -60,7 +53,6 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-white/20 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="relative">
@@ -80,7 +72,6 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* Navigation Links */}
           <div className="flex items-center space-x-4">
             <Link
               to="/"
@@ -136,7 +127,6 @@ const Navbar = () => {
                     </div>
                   </div>
 
-                  {/* Dropdown Menu */}
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50">
                     <div className="p-2">
                       <div className="px-4 py-3 border-b border-gray-100">

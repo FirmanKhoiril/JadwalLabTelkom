@@ -4,8 +4,8 @@ import FilterSidebar from '../components/FilterSidebar';
 import LabInfoCards from '../components/LabInfoCard';
 import ScheduleTable from '../components/ScheduleTable';
 import Footer from '../components/Footer';
-import { getRealTimeSchedules } from '../firebase/config';
-import { labs, days, statuses } from '../data/scheduleData';
+import { getRealTimeSchedules, getUniqueLabs } from '../firebase/config';
+import { days, statuses } from '../data/scheduleData';
 
 const Homepage = () => {
   const [schedule, setSchedule] = useState([]);
@@ -18,9 +18,11 @@ const Homepage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [indexBuilding, setIndexBuilding] = useState(false);
+  const [labs, setLabs] = useState([]);
+  const [loadingLabs, setLoadingLabs] = useState(true);
+  const [activeLabNames, setActiveLabNames] = useState([]);
 
   useEffect(() => {
-    
     setLoading(true);
     setError(null);
     setIndexBuilding(false);
@@ -31,8 +33,11 @@ const Homepage = () => {
         setSchedule(data);
         setLoading(false);
         setIndexBuilding(false);
-      }, (error) => {
         
+        if (data.length > 0) {
+          calculateActiveLabsFromSchedules(data);
+        }
+      }, (error) => {
         if (error.code === 'failed-precondition' && 
             error.message.includes('currently building')) {
           setIndexBuilding(true);
@@ -56,13 +61,64 @@ const Homepage = () => {
     }
   }, []);
 
+  const calculateActiveLabsFromSchedules = (schedules) => {
+    const currentDateTime = new Date();
+    const currentDay = getCurrentDayName(currentDateTime);
+    const currentTimeString = currentDateTime.toTimeString().substring(0, 5);
+    
+    const activeLabs = new Set();
+    
+    schedules.forEach(schedule => {
+      if (schedule.hari === currentDay) {
+        const [startTime, endTime] = schedule.waktu ? schedule.waktu.split('-') : ['', ''];
+        
+        if (startTime && endTime && isCurrentTimeInRange(currentTimeString, startTime, endTime)) {
+          activeLabs.add(schedule.lab);
+        }
+      }
+    });
+    
+    setActiveLabNames(Array.from(activeLabs));
+  };
+
+  const getCurrentDayName = (date) => {
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    return days[date.getDay()];
+  };
+
+  const isCurrentTimeInRange = (currentTime, startTime, endTime) => {
+    const [currentHour, currentMinute] = currentTime.split(':').map(Number);
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    
+    return currentTotalMinutes >= startTotalMinutes && currentTotalMinutes <= endTotalMinutes;
+  };
+
+  useEffect(() => {
+    const unsubscribeLabs = getUniqueLabs((fetchedLabs) => {
+      setLabs(fetchedLabs);
+      setLoadingLabs(false);
+    });
+
+    return () => {
+      if (unsubscribeLabs) unsubscribeLabs();
+    };
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+      if (allSchedules.length > 0) {
+        calculateActiveLabsFromSchedules(allSchedules);
+      }
+    }, 60000);
     
     return () => clearInterval(timer);
-  }, []);
+  }, [allSchedules]);
 
   useEffect(() => {
     if (allSchedules.length === 0) {
@@ -106,17 +162,40 @@ const Homepage = () => {
     };
   };
 
-  const calculateActiveLabs = () => {
-    if (allSchedules.length === 0) return 0;
+  const calculateLabCardsData = () => {
+    const labMap = new Map();
     
-    const allLabs = [...new Set(allSchedules.map(s => s.lab))];
-    
-    const activeLabs = allLabs.filter(labName => {
-      const labSchedules = allSchedules.filter(s => s.lab === labName);
-      return labSchedules.some(s => s.status === 'Sedang Berlangsung');
+    allSchedules.forEach(schedule => {
+      const labName = schedule.lab || 'Unknown Lab';
+      
+      if (!labMap.has(labName)) {
+        labMap.set(labName, {
+          name: labName,
+          id: labName.toLowerCase().replace(/\s+/g, '-'),
+          total: 0,
+          ongoing: 0,
+          upcoming: 0,
+          empty: 0
+        });
+      }
+      
+      const lab = labMap.get(labName);
+      lab.total++;
+      
+      if (schedule.status === 'Sedang Berlangsung' || schedule.status === 'Berlangsung') {
+        lab.ongoing++;
+      } else if (schedule.status === 'Akan Datang') {
+        lab.upcoming++;
+      } else if (schedule.status === 'Kosong') {
+        lab.empty++;
+      }
     });
     
-    return activeLabs.length;
+    return Array.from(labMap.values());
+  };
+
+  const calculateActiveLabs = () => {
+    return activeLabNames.length;
   };
 
   const resetFilters = () => {
@@ -192,6 +271,7 @@ const Homepage = () => {
 
   const stats = calculateStats();
   const activeLabsCount = calculateActiveLabs();
+  const labCardsData = calculateLabCardsData();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 md:p-8">
@@ -224,13 +304,7 @@ const Homepage = () => {
           
           <div className="lg:col-span-3">
             <LabInfoCards 
-              labs={labs.map(lab => ({
-                ...lab,
-                total: allSchedules.filter(s => s.lab === lab.name).length,
-                ongoing: allSchedules.filter(s => s.lab === lab.name && s.status === 'Sedang Berlangsung').length,
-                upcoming: allSchedules.filter(s => s.lab === lab.name && s.status === 'Akan Datang').length,
-                empty: allSchedules.filter(s => s.lab === lab.name && s.status === 'Kosong').length
-              }))} 
+              labs={labCardsData}
               totalSchedules={allSchedules.length}
             />
             

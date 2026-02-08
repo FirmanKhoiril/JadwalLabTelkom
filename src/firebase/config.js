@@ -237,7 +237,7 @@ export const getAllSchedules = () => {
   });
 };
 
-export const getRealTimeSchedules = (callback) => {
+export const getRealTimeSchedules = (callback, errorCallback) => {
   try {
     const q = query(scheduleCollection, orderBy('Hari', 'asc'));
     
@@ -271,14 +271,228 @@ export const getRealTimeSchedules = (callback) => {
         callback(schedules);
       },
       (error) => {
-        callback([]);
+        if (errorCallback) {
+          errorCallback(error);
+        } else {
+          callback([]);
+        }
       }
     );
     
     return unsubscribe;
   } catch (error) {
+    if (errorCallback) {
+      errorCallback(error);
+    }
     return () => {};
   }
+};
+
+export const getLabsFromSchedules = (callback) => {
+  const q = query(scheduleCollection, orderBy('Lab', 'asc'));
+  
+  return onSnapshot(q, (snapshot) => {
+    const labs = [];
+    const labNames = new Set();
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const labName = data.Lab || '';
+      
+      if (labName && !labNames.has(labName)) {
+        labNames.add(labName);
+        
+        const labSchedules = [];
+        snapshot.forEach((doc2) => {
+          const data2 = doc2.data();
+          if (data2.Lab === labName) {
+            labSchedules.push({
+              id: doc2.id,
+              hari: data2.Hari || '',
+              waktu: data2.Waktu || '',
+              matkul: data2.MatKul || '',
+              kelas: data2.KeLas || '',
+              dosen: data2.Dosen || '',
+              status: data2.Status || 'Akan Datang'
+            });
+          }
+        });
+        
+        const today = new Date();
+        const currentHour = today.getHours();
+        const currentMinute = today.getMinutes();
+        
+        let ongoingCount = 0;
+        let upcomingCount = 0;
+        let emptyCount = 0;
+        
+        labSchedules.forEach(schedule => {
+          if (schedule.status === 'Sedang Berlangsung') {
+            ongoingCount++;
+          } else if (schedule.status === 'Akan Datang') {
+            upcomingCount++;
+          } else if (schedule.status === 'Kosong') {
+            emptyCount++;
+          }
+        });
+        
+        labs.push({
+          id: labName.toLowerCase().replace(/\s+/g, '-'),
+          name: labName,
+          total: labSchedules.length,
+          ongoing: ongoingCount,
+          upcoming: upcomingCount,
+          empty: emptyCount,
+          capacity: 30,
+          location: `Gedung Teknik ${labName.includes('Multimedia') ? 'Lantai 2' : 'Lantai 3'}`,
+          schedules: labSchedules
+        });
+      }
+    });
+    
+    callback(labs);
+  }, (error) => {
+    console.error("Error fetching labs from schedules:", error);
+    callback([]);
+  });
+};
+
+export const getLabsRealtime = (callback) => {
+  const q = query(scheduleCollection, orderBy('Lab', 'asc'));
+  
+  return onSnapshot(q, (snapshot) => {
+    const labNames = new Set();
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const labName = data.Lab || '';
+      if (labName) {
+        labNames.add(labName);
+      }
+    });
+    
+    const labs = Array.from(labNames).map((labName, index) => {
+      const labSchedules = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.Lab === labName) {
+          labSchedules.push({
+            id: doc.id,
+            hari: data.Hari || '',
+            waktu: data.Waktu || '',
+            matkul: data.MatKul || '',
+            kelas: data.KeLas || '',
+            dosen: data.Dosen || '',
+            status: data.Status || 'Akan Datang'
+          });
+        }
+      });
+      
+      const ongoingCount = labSchedules.filter(s => s.status === 'Sedang Berlangsung').length;
+      const upcomingCount = labSchedules.filter(s => s.status === 'Akan Datang').length;
+      const emptyCount = labSchedules.filter(s => s.status === 'Kosong').length;
+      
+      return {
+        id: `lab-${index + 1}`,
+        name: labName,
+        capacity: labName.includes('Multimedia') ? 25 : labName.includes('AI') ? 20 : 30,
+        location: `Gedung Teknik ${labName.includes('Multimedia') ? 'Lantai 2' : labName.includes('AI') ? 'Lantai 4' : 'Lantai 3'}`,
+        description: `Laboratorium ${labName} untuk praktikum`,
+        facilities: ['Komputer', 'AC', 'Proyektor', 'Internet'],
+        total: labSchedules.length,
+        ongoing: ongoingCount,
+        upcoming: upcomingCount,
+        empty: emptyCount
+      };
+    });
+    
+    callback(labs);
+  }, (error) => {
+    console.error("Error fetching labs:", error);
+    callback([]);
+  });
+};
+
+export const getLabs = () => {
+  return new Promise((resolve, reject) => {
+    const q = query(scheduleCollection, orderBy('Lab', 'asc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const labNames = new Set();
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const labName = data.Lab || '';
+        if (labName) {
+          labNames.add(labName);
+        }
+      });
+      
+      const labs = Array.from(labNames).map((labName, index) => {
+        const labSchedules = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.Lab === labName) {
+            labSchedules.push({
+              id: doc.id,
+              hari: data.Hari || '',
+              waktu: data.Waktu || '',
+              matkul: data.MatKul || '',
+              kelas: data.KeLas || '',
+              dosen: data.Dosen || '',
+              status: data.Status || 'Akan Datang'
+            });
+          }
+        });
+        
+        const ongoingCount = labSchedules.filter(s => s.status === 'Sedang Berlangsung').length;
+        const upcomingCount = labSchedules.filter(s => s.status === 'Akan Datang').length;
+        const emptyCount = labSchedules.filter(s => s.status === 'Kosong').length;
+        
+        return {
+          id: `lab-${index + 1}`,
+          name: labName,
+          capacity: labName.includes('Multimedia') ? 25 : labName.includes('AI') ? 20 : 30,
+          location: `Gedung Teknik ${labName.includes('Multimedia') ? 'Lantai 2' : labName.includes('AI') ? 'Lantai 4' : 'Lantai 3'}`,
+          description: `Laboratorium ${labName} untuk praktikum`,
+          facilities: ['Komputer', 'AC', 'Proyektor', 'Internet'],
+          total: labSchedules.length,
+          ongoing: ongoingCount,
+          upcoming: upcomingCount,
+          empty: emptyCount
+        };
+      });
+      
+      resolve(labs);
+      unsubscribe();
+    }, reject);
+  });
+};
+
+export const getUniqueLabs = (callback) => {
+  const q = query(scheduleCollection);
+  
+  return onSnapshot(q, (snapshot) => {
+    const labNames = new Set();
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const labName = data.Lab || '';
+      if (labName) {
+        labNames.add(labName);
+      }
+    });
+    
+    const labs = Array.from(labNames).map(labName => ({
+      name: labName,
+      id: labName.toLowerCase().replace(/\s+/g, '-')
+    }));
+    
+    callback(labs);
+  }, (error) => {
+    console.error("Error fetching unique labs:", error);
+    callback([]);
+  });
 };
 
 export const logout = async () => {

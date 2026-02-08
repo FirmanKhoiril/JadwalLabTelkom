@@ -7,7 +7,7 @@ export const labs = [
 export const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
 export const statuses = [
-  { value: 'berlangsung', label: 'Sedang Berlangsung', color: 'bg-green-100 text-green-800' },
-  { value: 'akan datang', label: 'Akan Datang', color: 'bg-blue-100 text-blue-800' },
-  { value: 'kosong', label: 'Kosong', color: 'bg-gray-100 text-gray-800' }
+  { value: 'Berlangsung', label: 'Sedang Berlangsung', color: 'bg-green-100 text-green-800' },
+  { value: 'Akan Datang', label: 'Akan Datang', color: 'bg-blue-100 text-blue-800' },
+  { value: 'Kosong', label: 'Kosong', color: 'bg-gray-100 text-gray-800' }
 ];

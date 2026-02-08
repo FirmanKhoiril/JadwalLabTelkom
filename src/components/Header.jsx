@@ -1,12 +1,8 @@
-// components/Header.js
-import React from 'react';
-
 const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, scheduleStats = {}, activeLabsCount = 0 }) => {
   const formatTime = (date) => {
     return date.toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
     });
   };
 
@@ -34,7 +30,6 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
       <div className="relative bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg p-8 border border-white/30">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
           
-          {/* Logo dan Judul */}
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-4">
               <div className="relative">
@@ -60,7 +55,6 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
               </div>
             </div>
             
-            {/* Status Indicator */}
             <div className="flex flex-wrap gap-4 mt-6">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${stats.ongoing > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
@@ -79,7 +73,6 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
             </div>
           </div>
           
-          {/* Waktu dan Tanggal */}
           <div className="relative group">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-500"></div>
             
@@ -117,13 +110,10 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
               </div>
             </div>
             
-            {/* Decorative Elements */}
             <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-400 rounded-full animate-ping"></div>
             <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-purple-400 rounded-full"></div>
           </div>
         </div>
-        
-        {/* Quick Stats Bar */}
         <div className="mt-8 pt-6 border-t border-gray-200/50">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
@@ -146,7 +136,6 @@ const Header = ({ currentTime, totalSchedules = 0, filteredSchedules = 0, schedu
         </div>
       </div>
       
-      {/* Floating Elements */}
       <div className="absolute top-6 right-10 w-24 h-24 bg-blue-400/10 rounded-full blur-2xl"></div>
       <div className="absolute bottom-6 left-10 w-32 h-32 bg-purple-400/10 rounded-full blur-3xl"></div>
     </header>
